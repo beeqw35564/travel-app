@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบันทึกการเดินทาง</title>
+    
+    <!-- นำเข้าแผนที่ Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- นำเข้า LIFF SDK สำหรับเชื่อมต่อ LINE -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background-color: #f4f7f6; margin: 0; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        input[type="text"], input[type="password"] { width: 100%; padding: 12px; margin: 8px 0 20px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { border: none; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 10px; color: white;}
+        button:disabled { background-color: #cccccc !important; cursor: not-allowed; }
+        
+        .btn-primary { background-color: #007bff; } .btn-primary:hover { background-color: #0056b3; }
+        .btn-success { background-color: #28a745; } .btn-success:hover { background-color: #218838; }
+        .btn-warning { background-color: #ffc107; color: black; } .btn-warning:hover { background-color: #e0a800; }
+        .btn-danger { background-color: #dc3545; margin-top: 15px; } .btn-danger:hover { background-color: #c82333; }
+        
+        #statusText, #appStatus { font-size: 14px; margin-bottom: 15px; min-height: 20px; }
+        #map { height: 300px; width: 100%; border-radius: 8px; display: none; margin-top: 15px; z-index: 1; }
+        .custom-photo-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5); object-fit: cover; }
+        .hidden { display: none !important; }
+        
+        /* หน้าจอโหลด LIFF */
+        #liffLoading { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;}
+    </style>
+</head>
+<body>
+
+    <!-- หน้าจอรอโหลดระบบ LINE -->
+    <div id="liffLoading">
+        <h2 style="color:#00c300;">LINE App</h2>
+        <p>กำลังเชื่อมต่อระบบเพื่อตรวจสอบสิทธิ์...</p>
+    </div>
+
+    <div class="container hidden" id="mainContainer">
+        <!-- 1. หน้าเข้าสู่ระบบ -->
+        <div id="authSection">
+            <h2>🔐 เข้าสู่ระบบ</h2>
+            <p id="statusText" style="color: #dc3545;"></p>
+            <div style="text-align: left;">
+                <label><b>ชื่อผู้ใช้งาน</b></label>
+                <input type="text" id="usernameInput" placeholder="กรอกชื่อผู้ใช้">
+                
+                <label><b>รหัสผ่าน</b></label>
+                <input type="password" id="passwordInput" placeholder="กรอกรหัสผ่าน">
+            </div>
+            <button id="loginBtn" class="btn-primary">เข้าสู่ระบบ</button>
+            <button id="registerBtn" class="btn-success">สมัครสมาชิกใหม่</button>
+        </div>
+
+        <!-- 2. หน้าแอปพลิเคชันหลัก -->
+        <div id="appSection" class="hidden">
+            <h2>📍 ระบบติดตามการเดินทาง</h2>
+            <p style="text-align: left; margin-bottom: 20px;">ผู้ใช้งาน: <strong id="displayUsername" style="color:#007bff;"></strong></p>
+
+            <button id="startTripBtn" class="btn-success" style="padding: 15px; font-size: 18px;">🚗 เริ่มการเดินทาง</button>
+
+            <div id="tripControls" class="hidden">
+                <div style="margin-bottom: 15px; text-align: left; background: #e9ecef; padding: 10px; border-radius: 8px;">
+                    <label for="cameraInput" style="font-weight: bold; font-size: 14px;">📸 ถ่ายรูปสถานที่</label><br>
+                    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="margin-top: 5px; width: 100%;">
+                </div>
+                <button id="checkinBtn" class="btn-primary">📍 บันทึกพิกัด (เช็คอิน)</button>
+                <button id="endTripBtn" class="btn-warning">🏁 สิ้นสุดการเดินทาง</button>
+            </div>
+
+            <p id="appStatus"></p>
+            <div id="map"></div>
+            <button id="logoutBtn" class="btn-danger">ออกจากระบบ</button>
+        </div>
+    </div>
+
+    <script>
+        // 🛑 1. ใส่ Web App URL ของคุณที่นี่ (ตรวจสอบให้ชัวร์)
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvEJM9M3XdRXUmwrzBu0YDmH-Ft1B-nbbwrW1KWfAHGB9jnBzam_if0VlpAOr0P_hjQg/exec';
+        
+        let liffUserId = ""; 
+        let myMap = null, currentUser = "", currentTripId = null;
+        let routeCoordinates = [], routeLine = null;
+
+        // --- ระบบ LIFF เริ่มทำงาน ---
+        async function initializeLiff() {
+            try {
+                // 🛑 2. ใส่ LIFF ID ที่คุณสร้างมาตรงนี้ (เช่น 165xxxxxxx-xxxxxxx)
+                await liff.init({ liffId: "2011078075-i7j9DKxk" }); 
+                
+                if (liff.isLoggedIn()) {
+                    const profile = await liff.getProfile();
+                    liffUserId = profile.userId; // ดูดรหัส User ID มาเก็บไว้แบบเนียนๆ
+                    
+                    document.getElementById('liffLoading').style.display = 'none';
+                    document.getElementById('mainContainer').classList.remove('hidden');
+                } else {
+                    // ถ้ายังไม่ได้ล็อกอิน ให้เด้งไปหน้าล็อกอินของ LINE
+                    liff.login(); 
+                }
+            } catch (err) {
+                document.getElementById('liffLoading').innerHTML = `<p style="color:red;">การเชื่อมต่อ LIFF ล้มเหลว: ${err.message}</p>`;
+            }
+        }
+        
+        initializeLiff();
+
+        const callAPI = (payload, callback) => {
+            fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+            .then(res => res.json()).then(callback).catch(err => console.log(err));
+        };
+
+        const handleAuth = (action) => {
+            const user = document.getElementById('usernameInput').value.trim();
+            const pass = document.getElementById('passwordInput').value.trim();
+
+            if(!user || !pass) return document.getElementById('statusText').innerText = "กรุณากรอกชื่อและรหัสผ่าน";
+            document.getElementById('statusText').innerText = "กำลังประมวลผล...";
+            
+            // แอบส่ง liffUserId ไปด้วยเพื่อบันทึกลง Sheet
+            callAPI({ action: action, username: user, password: pass, lineUserId: liffUserId }, (data) => {
+                if(data.status === 'success') {
+                    currentUser = user; 
+                    document.getElementById('displayUsername').innerText = currentUser;
+                    document.getElementById('authSection').classList.add('hidden'); 
+                    document.getElementById('appSection').classList.remove('hidden');
+                } else {
+                    document.getElementById('statusText').innerText = data.message;
+                }
+            });
+        };
+        
+        document.getElementById('loginBtn').addEventListener('click', () => handleAuth('login'));
+        document.getElementById('registerBtn').addEventListener('click', () => handleAuth('register'));
+        document.getElementById('logoutBtn').addEventListener('click', () => { location.reload(); });
+
+        document.getElementById('startTripBtn').addEventListener('click', () => {
+            currentTripId = "TRIP_" + new Date().getTime(); 
+            routeCoordinates = []; 
+            if(routeLine && myMap) myMap.removeLayer(routeLine);
+            
+            document.getElementById('startTripBtn').classList.add('hidden');
+            document.getElementById('tripControls').classList.remove('hidden');
+            document.getElementById('appStatus').innerText = "กำลังแจ้งเตือนระบบว่าเริ่มเดินทาง...";
+
+            callAPI({ action: 'notify', type: 'start', username: currentUser, tripId: currentTripId }, (data) => {
+                if(data.status === 'success') {
+                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!<br>ระบบส่งข้อความแจ้งเตือนเข้า LINE เรียบร้อย";
+                    document.getElementById('appStatus').style.color = "#28a745";
+                } else {
+                    document.getElementById('appStatus').innerHTML = "เริ่มการเดินทางแล้ว (แจ้งเตือน LINE ไม่สำเร็จ: " + data.message + ")";
+                }
+            });
+        });
+
+        document.getElementById('checkinBtn').addEventListener('click', () => {
+            if (!navigator.geolocation) return;
+            const btn = document.getElementById('checkinBtn');
+            const status = document.getElementById('appStatus');
+            btn.disabled = true; status.innerText = "กำลังค้นหาพิกัดและวาดแผนที่..."; status.style.color = "black";
+
+            navigator.geolocation.getCurrentPosition((position) => {
+                const lat = position.coords.latitude, lng = position.coords.longitude;
+                document.getElementById('map').style.display = 'block';
+
+                if (!myMap) {
+                    myMap = L.map('map').setView([lat, lng], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(myMap);
+                } else myMap.setView([lat, lng], 15);
+
+                routeCoordinates.push([lat, lng]);
+                if(routeCoordinates.length > 1) {
+                    if(routeLine) myMap.removeLayer(routeLine);
+                    routeLine = L.polyline(routeCoordinates, {color: 'blue', weight: 4}).addTo(myMap);
+                }
+
+                const sendCheckinData = (base64) => {
+                    callAPI({ action: 'checkin', username: currentUser, tripId: currentTripId, lat: lat, lng: lng, imageBase64: base64 }, (data) => {
+                        if(data.status === 'success') status.innerHTML = `✅ บันทึกจุดที่ ${routeCoordinates.length} สำเร็จ!`;
+                        btn.disabled = false;
+                    });
+                };
+
+                const fileInput = document.getElementById('cameraInput');
+                if (fileInput && fileInput.files.length > 0) {
+                    const reader = new FileReader();
+                    reader.onloadend = function(e) {
+                        const customIcon = L.icon({ iconUrl: e.target.result, iconSize: [40, 40], className: 'custom-photo-marker' });
+                        L.marker([lat, lng], {icon: customIcon}).addTo(myMap).bindPopup("จุดที่ " + routeCoordinates.length).openPopup();
+                        sendCheckinData(reader.result); 
+                    };
+                    reader.readAsDataURL(fileInput.files[0]); 
+                } else {
+                    L.marker([lat, lng]).addTo(myMap).bindPopup("จุดที่ " + routeCoordinates.length).openPopup();
+                    sendCheckinData(""); 
+                }
+            }, null, { enableHighAccuracy: true });
+        });
+
+        document.getElementById('endTripBtn').addEventListener('click', () => {
+            if(confirm("คุณต้องการสิ้นสุดการเดินทางนี้ใช่หรือไม่?")) {
+                document.getElementById('tripControls').classList.add('hidden');
+                document.getElementById('startTripBtn').classList.remove('hidden');
+                document.getElementById('appStatus').innerText = "กำลังสรุปผลและแจ้งเตือนระบบ...";
+
+                callAPI({ action: 'notify', type: 'end', username: currentUser, tripId: currentTripId, totalStops: routeCoordinates.length }, () => {
+                    document.getElementById('appStatus').innerHTML = `🏁 สิ้นสุดการเดินทาง!<br>สรุปคุณแวะไปทั้งหมด ${routeCoordinates.length} สถานที่<br>(แจ้งเตือนผลสรุปเข้า LINE เรียบร้อย)`;
+                    document.getElementById('appStatus').style.color = "#d39e00";
+                    currentTripId = null;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
