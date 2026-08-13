@@ -55,6 +55,10 @@
             </div>
             <button id="loginBtn" class="btn-primary">เข้าสู่ระบบ</button>
             <button id="registerBtn" class="btn-success">สมัครสมาชิกใหม่</button>
+
+            <!-- เพิ่มเส้นคั่น และปุ่มล็อกอินด้วย LINE -->
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
+            <button id="lineLoginBtn" style="background-color: #06C755; color: white; font-weight: bold;">💬 ล็อกอินด้วย LINE</button>
         </div>
 
         <!-- 2. หน้าแอปพลิเคชันหลัก -->
@@ -75,12 +79,25 @@
 
             <p id="appStatus"></p>
             <div id="map"></div>
+
+            <!-- ส่วนแสดงผลสรุป (Strava Style) -->
+            <div id="summarySection" class="hidden" style="margin-top: 15px; background: white; padding: 25px 20px; border-radius: 10px; box-shadow: 0 -5px 20px rgba(0,0,0,0.15); position: relative; z-index: 10;">
+                <p style="font-size: 14px; color: gray; margin: 0;">🎉 สรุปเส้นทางการเดินทาง</p>
+                <h1 style="font-size: 45px; margin: 5px 0;">
+                    <span id="summaryDistance" style="color: #111;">0.00</span> <span style="font-size: 20px; color: #555;">km</span>
+                </h1>
+                <p style="color: gray; font-size: 12px; letter-spacing: 2px; margin-bottom: 20px; font-weight: bold;">DISTANCE</p>
+                <p style="font-size: 16px; border-top: 1px solid #eee; padding-top: 15px;">📍 แวะถ่ายรูปและเช็คอินทั้งหมด: <b id="summaryStops" style="color:#007bff;">0</b> จุด</p>
+                <button id="closeSummaryBtn" class="btn-success" style="margin-top: 10px;">✅ เสร็จสิ้น (กลับหน้าหลัก)</button>
+            </div>
+
             <button id="logoutBtn" class="btn-danger">ออกจากระบบ</button>
+            <button id="openExternalBtn" style="background-color: #6c757d; color: white; border: none; padding: 12px; width: 100%; margin-top: 10px; border-radius: 5px;">🌐 เปิดหน้าเว็บในเบราเซอร์</button>
         </div>
     </div>
 
     <script>
-        // 🛑 1. ใส่ Web App URL ของคุณที่นี่ (ตรวจสอบให้ชัวร์)
+        // 🛑 1. ใส่ Web App URL ของคุณที่นี่
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvEJM9M3XdRXUmwrzBu0YDmH-Ft1B-nbbwrW1KWfAHGB9jnBzam_if0VlpAOr0P_hjQg/exec';
         
         let liffUserId = ""; 
@@ -90,25 +107,41 @@
         // --- ระบบ LIFF เริ่มทำงาน ---
         async function initializeLiff() {
             try {
-                // 🛑 2. ใส่ LIFF ID ที่คุณสร้างมาตรงนี้ (เช่น 165xxxxxxx-xxxxxxx)
+                // 🛑 ใส่ LIFF ID ของคุณ
                 await liff.init({ liffId: "2011078075-i7j9DKxk" }); 
                 
                 if (liff.isLoggedIn()) {
+                    // ดึงโปรไฟล์ LINE ทันที
                     const profile = await liff.getProfile();
-                    liffUserId = profile.userId; // ดูดรหัส User ID มาเก็บไว้แบบเนียนๆ
-                    
-                    document.getElementById('liffLoading').style.display = 'none';
-                    document.getElementById('mainContainer').classList.remove('hidden');
-                } else {
-                    // ถ้ายังไม่ได้ล็อกอิน ให้เด้งไปหน้าล็อกอินของ LINE
-                    liff.login(); 
-                }
+                    liffUserId = profile.userId; 
+                    currentUser = profile.displayName; // ใช้ชื่อ LINE เป็นชื่อผู้ใช้เลย
+
+                    // แอบลงทะเบียนในพื้นหลัง เพื่อให้บอทรู้จักและส่งแจ้งเตือนได้
+                    callAPI({ action: 'register', username: currentUser, password: 'LINE_LOGIN', lineUserId: liffUserId }, () => {});
+
+                    // ข้ามหน้าล็อกอิน ไปหน้าแอปหลักทันที
+                    document.getElementById('displayUsername').innerText = currentUser;
+                    document.getElementById('authSection').classList.add('hidden');
+                    document.getElementById('appSection').classList.remove('hidden');
+                } 
+                
+                document.getElementById('liffLoading').style.display = 'none';
+                document.getElementById('mainContainer').classList.remove('hidden');
+                
             } catch (err) {
                 document.getElementById('liffLoading').innerHTML = `<p style="color:red;">การเชื่อมต่อ LIFF ล้มเหลว: ${err.message}</p>`;
             }
         }
         
         initializeLiff();
+
+        // 🛑 Event สำหรับปุ่ม "ล็อกอินด้วย LINE"
+        document.getElementById('lineLoginBtn').addEventListener('click', () => {
+            if (!liff.isLoggedIn()) {
+                // คำสั่งนี้จะเด้งพาผู้ใช้ไปหน้ากดยอมรับสิทธิ์ของ LINE อัตโนมัติ
+                liff.login(); 
+            }
+        });
 
         const callAPI = (payload, callback) => {
             fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
@@ -122,7 +155,6 @@
             if(!user || !pass) return document.getElementById('statusText').innerText = "กรุณากรอกชื่อและรหัสผ่าน";
             document.getElementById('statusText').innerText = "กำลังประมวลผล...";
             
-            // แอบส่ง liffUserId ไปด้วยเพื่อบันทึกลง Sheet
             callAPI({ action: action, username: user, password: pass, lineUserId: liffUserId }, (data) => {
                 if(data.status === 'success') {
                     currentUser = user; 
@@ -137,7 +169,33 @@
         
         document.getElementById('loginBtn').addEventListener('click', () => handleAuth('login'));
         document.getElementById('registerBtn').addEventListener('click', () => handleAuth('register'));
-        document.getElementById('logoutBtn').addEventListener('click', () => { location.reload(); });
+        
+        // อัปเดตปุ่มออกจากระบบให้เตะออกจาก LINE Login ด้วย
+        document.getElementById('logoutBtn').addEventListener('click', () => { 
+            if (liff.isLoggedIn()) {
+                liff.logout();
+            }
+            location.reload(); 
+        });
+        
+        document.getElementById('openExternalBtn').addEventListener('click', () => {
+            if(liff.isInClient()){
+                liff.openWindow({ url: 'https://beeqw35564.github.io/travel-app/', external: true });
+            } else {
+                alert("คุณเปิดผ่านเบราเซอร์อยู่แล้วครับ!");
+            }
+        });
+
+        function calculateDistance(coords) {
+            let total = 0;
+            if (coords.length < 2) return "0.00";
+            for (let i = 0; i < coords.length - 1; i++) {
+                let p1 = L.latLng(coords[i][0], coords[i][1]);
+                let p2 = L.latLng(coords[i+1][0], coords[i+1][1]);
+                total += p1.distanceTo(p2); 
+            }
+            return (total / 1000).toFixed(2); 
+        }
 
         document.getElementById('startTripBtn').addEventListener('click', () => {
             currentTripId = "TRIP_" + new Date().getTime(); 
@@ -171,7 +229,9 @@
                 if (!myMap) {
                     myMap = L.map('map').setView([lat, lng], 15);
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(myMap);
-                } else myMap.setView([lat, lng], 15);
+                } else {
+                    myMap.setView([lat, lng], 15);
+                }
 
                 routeCoordinates.push([lat, lng]);
                 if(routeCoordinates.length > 1) {
@@ -205,13 +265,37 @@
         document.getElementById('endTripBtn').addEventListener('click', () => {
             if(confirm("คุณต้องการสิ้นสุดการเดินทางนี้ใช่หรือไม่?")) {
                 document.getElementById('tripControls').classList.add('hidden');
-                document.getElementById('startTripBtn').classList.remove('hidden');
-                document.getElementById('appStatus').innerText = "กำลังสรุปผลและแจ้งเตือนระบบ...";
+                document.getElementById('appStatus').innerText = "กำลังสรุปผลเส้นทาง...";
+
+                const totalDistance = calculateDistance(routeCoordinates);
 
                 callAPI({ action: 'notify', type: 'end', username: currentUser, tripId: currentTripId, totalStops: routeCoordinates.length }, () => {
-                    document.getElementById('appStatus').innerHTML = `🏁 สิ้นสุดการเดินทาง!<br>สรุปคุณแวะไปทั้งหมด ${routeCoordinates.length} สถานที่<br>(แจ้งเตือนผลสรุปเข้า LINE เรียบร้อย)`;
-                    document.getElementById('appStatus').style.color = "#d39e00";
+                    document.getElementById('appStatus').innerText = "";
+
+                    if (routeLine && myMap) {
+                        myMap.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                    }
+
+                    document.getElementById('summaryStops').innerText = routeCoordinates.length;
+                    document.getElementById('summaryDistance').innerText = totalDistance;
+                    document.getElementById('summarySection').classList.remove('hidden');
+
                     currentTripId = null;
+                });
+            }
+        });
+
+        document.getElementById('closeSummaryBtn').addEventListener('click', () => {
+            document.getElementById('summarySection').classList.add('hidden');
+            document.getElementById('startTripBtn').classList.remove('hidden');
+            document.getElementById('map').style.display = 'none';
+            document.getElementById('appStatus').innerText = "";
+            
+            if (myMap) {
+                myMap.eachLayer((layer) => {
+                    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                        myMap.removeLayer(layer);
+                    }
                 });
             }
         });
