@@ -174,7 +174,27 @@
         let liffUserId = ""; 
         let myMap = null, currentUser = "", currentTripId = null;
         let routeCoordinates = []; 
-        let routingControl = null; // 🌟 ใช้ตัวนี้ควบคุมเส้นทางตามถนนแทน
+        let routingControl = null;
+
+        // 🌟 ฟังก์ชันเรียกการแจ้งเตือนของเบราว์เซอร์
+        function showBrowserNotification(title, message) {
+            if (!("Notification" in window)) return;
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: message, icon: "https://cdn-icons-png.flaticon.com/512/854/854878.png" });
+            } 
+            else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(function (permission) {
+                    if (permission === "granted") {
+                        new Notification(title, { body: message, icon: "https://cdn-icons-png.flaticon.com/512/854/854878.png" });
+                    }
+                });
+            }
+        }
+
+        // ขออนุญาตแจ้งเตือนตั้งแต่ตอนโหลดหน้าเว็บเสร็จ
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
 
         // --- 🌟 ฟังก์ชันระบบความจำ (Local Storage) ---
         function saveTripState() {
@@ -238,7 +258,7 @@
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('appSection').classList.remove('hidden');
 
-                    restoreTripState(); // 🌟 โหลดข้อมูลที่จำไว้
+                    restoreTripState();
                 } 
             } catch (err) {
                 console.log("LIFF Init Error: ", err.message);
@@ -272,7 +292,7 @@
                     document.getElementById('authSection').classList.add('hidden'); 
                     document.getElementById('appSection').classList.remove('hidden');
 
-                    restoreTripState(); // 🌟 โหลดข้อมูลที่จำไว้
+                    restoreTripState(); 
                 } else {
                     document.getElementById('statusText').innerText = data.message;
                 }
@@ -311,7 +331,7 @@
         document.getElementById('startTripBtn').addEventListener('click', () => {
             currentTripId = "TRIP_" + new Date().getTime(); 
             routeCoordinates = []; 
-            clearTripState(); // เริ่มใหม่ ล้างความจำเก่าทิ้ง
+            clearTripState(); 
             
             if(routingControl && myMap) myMap.removeControl(routingControl);
             routingControl = null;
@@ -322,9 +342,12 @@
 
             callAPI({ action: 'notify', type: 'start', username: currentUser, tripId: currentTripId }, (data) => {
                 if(data.status === 'success') {
-                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!<br>ระบบส่งข้อความแจ้งเตือนเข้า LINE เรียบร้อย";
+                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!";
                     document.getElementById('appStatus').style.color = "#28a745";
-                    saveTripState(); // 🌟 เซฟสถานะ
+                    saveTripState(); 
+
+                    // 🌟 แจ้งเตือนผ่านเบราว์เซอร์ (ตอนเริ่ม)
+                    showBrowserNotification("🚗 เริ่มการเดินทางแล้ว!", "ระบบกำลังบันทึกเส้นทางของคุณ ขอให้เดินทางปลอดภัยครับ!");
                 } else {
                     document.getElementById('appStatus').innerHTML = "เริ่มการเดินทางแล้ว (แจ้งเตือน LINE ไม่สำเร็จ: " + data.message + ")";
                 }
@@ -349,9 +372,8 @@
                 }
 
                 routeCoordinates.push([lat, lng]);
-                saveTripState(); // 🌟 อัปเดตความจำทุกครั้งที่เช็คอิน
+                saveTripState(); 
 
-                // 🌟 ระบบวาดเส้นตามถนน
                 if(routeCoordinates.length > 1) {
                     if(routingControl) {
                         routingControl.setWaypoints(routeCoordinates.map(c => L.latLng(c[0], c[1])));
@@ -408,7 +430,10 @@
                     document.getElementById('summarySection').classList.remove('hidden');
 
                     currentTripId = null;
-                    clearTripState(); // 🌟 เคลียร์ความจำเมื่อจบการเดินทางสมบูรณ์
+                    clearTripState(); 
+
+                    // 🌟 แจ้งเตือนผ่านเบราว์เซอร์ (ตอนสิ้นสุด)
+                    showBrowserNotification("🏁 สิ้นสุดการเดินทาง", `คุณแวะถ่ายรูปและเช็คอินไปทั้งหมด ${routeCoordinates.length} จุด พักผ่อนให้เต็มที่นะครับ`);
                 });
             }
         });
