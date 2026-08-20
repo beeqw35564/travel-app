@@ -24,7 +24,6 @@
             font-family: 'Prompt', sans-serif; 
             text-align: center; 
             padding: 20px; 
-            /* ไล่สีพื้นหลังให้ดูสดใสแบบพรีเมียม */
             background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); 
             min-height: 100vh;
             margin: 0; 
@@ -36,8 +35,8 @@
             margin: 0 auto; 
             background: rgba(255, 255, 255, 0.95); 
             padding: 35px 25px; 
-            border-radius: 24px; /* ขอบกล่องโค้งมน */
-            box-shadow: 0 15px 35px rgba(0,0,0,0.15); /* เงาฟุ้งๆ */
+            border-radius: 24px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15); 
             backdrop-filter: blur(10px);
         }
 
@@ -58,7 +57,6 @@
             transition: all 0.3s ease;
         }
 
-        /* เอฟเฟกต์ตอนกดช่องกรอกข้อมูล */
         input[type="text"]:focus, input[type="password"]:focus {
             border-color: #007bff;
             outline: none;
@@ -81,11 +79,9 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
 
-        /* เอฟเฟกต์ปุ่มยุบตัวเวลาโดนกด */
         button:active { transform: scale(0.96); }
         button:disabled { background: #cccccc !important; cursor: not-allowed; box-shadow: none; transform: none; }
         
-        /* ตกแต่งสีปุ่มแบบ Gradient */
         .btn-primary { background: linear-gradient(135deg, #007bff, #0056b3); } 
         .btn-primary:hover { box-shadow: 0 6px 20px rgba(0,123,255,0.3); }
         
@@ -107,7 +103,7 @@
         .custom-photo-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 5px 15px rgba(0,0,0,0.4); object-fit: cover; }
         
         .hidden { display: none !important; }
-        .leaflet-routing-container { display: none !important; } /* ซ่อนกล่องข้อความเส้นทาง */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -127,7 +123,6 @@
             <button id="loginBtn" class="btn-primary">เข้าสู่ระบบ</button>
             <button id="registerBtn" class="btn-success">สมัครสมาชิกใหม่</button>
 
-            <!-- เพิ่มเส้นคั่น และปุ่มล็อกอินด้วย LINE -->
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
             <button id="lineLoginBtn" style="background-color: #06C755; color: white; font-weight: bold;">💬 ล็อกอินด้วย LINE</button>
         </div>
@@ -168,7 +163,6 @@
     </div>
 
     <script>
-        // 🛑 ใส่ Web App URL ของคุณที่นี่
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvEJM9M3XdRXUmwrzBu0YDmH-Ft1B-nbbwrW1KWfAHGB9jnBzam_if0VlpAOr0P_hjQg/exec';
         
         let liffUserId = ""; 
@@ -176,7 +170,7 @@
         let routeCoordinates = []; 
         let routingControl = null;
 
-        // 🌟 ฟังก์ชันเรียกการแจ้งเตือนของเบราว์เซอร์
+        // 🌟 แจ้งเตือนเบราว์เซอร์
         function showBrowserNotification(title, message) {
             if (!("Notification" in window)) return;
             if (Notification.permission === "granted") {
@@ -191,12 +185,11 @@
             }
         }
 
-        // ขออนุญาตแจ้งเตือนตั้งแต่ตอนโหลดหน้าเว็บเสร็จ
         if ("Notification" in window && Notification.permission === "default") {
             Notification.requestPermission();
         }
 
-        // --- 🌟 ฟังก์ชันระบบความจำ (Local Storage) ---
+        // 🌟 ระบบความจำ
         function saveTripState() {
             localStorage.setItem('savedTripId', currentTripId);
             localStorage.setItem('savedCoordinates', JSON.stringify(routeCoordinates));
@@ -242,11 +235,9 @@
             }
         }
 
-        // --- ระบบ LIFF แอบทำงานอยู่หลังบ้านเงียบๆ ---
         async function initializeLiff() {
             try {
                 await liff.init({ liffId: "2011078075-i7j9DKxk" }); 
-                
                 if (liff.isLoggedIn()) {
                     const profile = await liff.getProfile();
                     liffUserId = profile.userId; 
@@ -268,9 +259,7 @@
         initializeLiff();
 
         document.getElementById('lineLoginBtn').addEventListener('click', () => {
-            if (!liff.isLoggedIn()) {
-                liff.login(); 
-            }
+            if (!liff.isLoggedIn()) liff.login(); 
         });
 
         const callAPI = (payload, callback) => {
@@ -303,9 +292,7 @@
         document.getElementById('registerBtn').addEventListener('click', () => handleAuth('register'));
         
         document.getElementById('logoutBtn').addEventListener('click', () => { 
-            if (liff.isLoggedIn()) {
-                liff.logout();
-            }
+            if (liff.isLoggedIn()) liff.logout();
             location.reload(); 
         });
         
@@ -328,6 +315,7 @@
             return (total / 1000).toFixed(2); 
         }
 
+        // 🌟 แก้ไขปุ่ม "เริ่มการเดินทาง" ให้แจ้งเตือนและจำข้อมูลได้ทันที
         document.getElementById('startTripBtn').addEventListener('click', () => {
             currentTripId = "TRIP_" + new Date().getTime(); 
             routeCoordinates = []; 
@@ -338,18 +326,19 @@
             
             document.getElementById('startTripBtn').classList.add('hidden');
             document.getElementById('tripControls').classList.remove('hidden');
-            document.getElementById('appStatus').innerText = "กำลังแจ้งเตือนระบบว่าเริ่มเดินทาง...";
+            document.getElementById('appStatus').innerText = "กำลังเริ่มต้นการเดินทาง...";
+
+            // 👉 ย้ายขึ้นมาทำงานทันที: จำข้อมูลและแจ้งเตือนเลย ไม่ต้องรอ API
+            saveTripState(); 
+            showBrowserNotification("🚗 เริ่มการเดินทางแล้ว!", "ระบบกำลังบันทึกเส้นทางของคุณ ขอให้เดินทางปลอดภัยครับ!");
 
             callAPI({ action: 'notify', type: 'start', username: currentUser, tripId: currentTripId }, (data) => {
                 if(data.status === 'success') {
-                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!";
+                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!<br>ระบบส่งข้อความแจ้งเตือนเข้า LINE เรียบร้อย";
                     document.getElementById('appStatus').style.color = "#28a745";
-                    saveTripState(); 
-
-                    // 🌟 แจ้งเตือนผ่านเบราว์เซอร์ (ตอนเริ่ม)
-                    showBrowserNotification("🚗 เริ่มการเดินทางแล้ว!", "ระบบกำลังบันทึกเส้นทางของคุณ ขอให้เดินทางปลอดภัยครับ!");
                 } else {
-                    document.getElementById('appStatus').innerHTML = "เริ่มการเดินทางแล้ว (แจ้งเตือน LINE ไม่สำเร็จ: " + data.message + ")";
+                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!<br><span style='color:gray; font-size:12px;'>(โหมดเบราว์เซอร์ - ไม่มีการแจ้งเตือนผ่าน LINE)</span>";
+                    document.getElementById('appStatus').style.color = "#28a745";
                 }
             });
         });
@@ -410,12 +399,17 @@
             }, null, { enableHighAccuracy: true });
         });
 
+        // 🌟 แก้ไขปุ่ม "สิ้นสุดการเดินทาง" ให้แจ้งเตือนและล้างข้อมูลทันที
         document.getElementById('endTripBtn').addEventListener('click', () => {
             if(confirm("คุณต้องการสิ้นสุดการเดินทางนี้ใช่หรือไม่?")) {
                 document.getElementById('tripControls').classList.add('hidden');
                 document.getElementById('appStatus').innerText = "กำลังสรุปผลเส้นทาง...";
 
                 const totalDistance = calculateDistance(routeCoordinates);
+
+                // 👉 ย้ายขึ้นมาทำงานทันที: แจ้งเตือนและล้างข้อมูลเลย ไม่ต้องรอ API
+                clearTripState(); 
+                showBrowserNotification("🏁 สิ้นสุดการเดินทาง", `คุณแวะถ่ายรูปและเช็คอินไปทั้งหมด ${routeCoordinates.length} จุด พักผ่อนให้เต็มที่นะครับ`);
 
                 callAPI({ action: 'notify', type: 'end', username: currentUser, tripId: currentTripId, totalStops: routeCoordinates.length }, () => {
                     document.getElementById('appStatus').innerText = "";
@@ -430,10 +424,6 @@
                     document.getElementById('summarySection').classList.remove('hidden');
 
                     currentTripId = null;
-                    clearTripState(); 
-
-                    // 🌟 แจ้งเตือนผ่านเบราว์เซอร์ (ตอนสิ้นสุด)
-                    showBrowserNotification("🏁 สิ้นสุดการเดินทาง", `คุณแวะถ่ายรูปและเช็คอินไปทั้งหมด ${routeCoordinates.length} จุด พักผ่อนให้เต็มที่นะครับ`);
                 });
             }
         });
