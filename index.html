@@ -8,37 +8,107 @@
     <!-- นำเข้าแผนที่ Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- 🌟 เพิ่มปลั๊กอิน Leaflet Routing Machine สำหรับลากเส้นตามถนน -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     
     <!-- นำเข้า LIFF SDK สำหรับเชื่อมต่อ LINE -->
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background-color: #f4f7f6; margin: 0; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        input[type="text"], input[type="password"] { width: 100%; padding: 12px; margin: 8px 0 20px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        button { border: none; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 10px; color: white;}
-        button:disabled { background-color: #cccccc !important; cursor: not-allowed; }
-        
-        .btn-primary { background-color: #007bff; } .btn-primary:hover { background-color: #0056b3; }
-        .btn-success { background-color: #28a745; } .btn-success:hover { background-color: #218838; }
-        .btn-warning { background-color: #ffc107; color: black; } .btn-warning:hover { background-color: #e0a800; }
-        .btn-danger { background-color: #dc3545; margin-top: 15px; } .btn-danger:hover { background-color: #c82333; }
-        
-        #statusText, #appStatus { font-size: 14px; margin-bottom: 15px; min-height: 20px; }
-        #map { height: 300px; width: 100%; border-radius: 8px; display: none; margin-top: 15px; z-index: 1; }
-        .custom-photo-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5); object-fit: cover; }
-        .hidden { display: none !important; }
+       /* นำเข้าฟอนต์ Prompt จาก Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 
-        /* 🌟 ซ่อนกล่องข้อความบอกทางของ Routing Machine ให้แผนที่ดูสะอาด */
+        body { 
+            font-family: 'Prompt', sans-serif; 
+            text-align: center; 
+            padding: 20px; 
+            /* ไล่สีพื้นหลังให้ดูสดใสแบบพรีเมียม */
+            background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); 
+            min-height: 100vh;
+            margin: 0; 
+            color: #2c3e50;
+        }
+
+        .container { 
+            max-width: 400px; 
+            margin: 0 auto; 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 35px 25px; 
+            border-radius: 24px; /* ขอบกล่องโค้งมน */
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15); /* เงาฟุ้งๆ */
+            backdrop-filter: blur(10px);
+        }
+
+        h2 { font-weight: 600; color: #1a252f; margin-top: 0; margin-bottom: 25px; }
+
+        label { display: block; text-align: left; font-size: 14px; margin-bottom: 5px; color: #555; }
+
+        input[type="text"], input[type="password"] { 
+            width: 100%; 
+            padding: 14px 16px; 
+            margin-bottom: 20px; 
+            border: 2px solid #e1e5eb; 
+            border-radius: 12px; 
+            box-sizing: border-box; 
+            font-family: 'Prompt', sans-serif;
+            font-size: 15px;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        /* เอฟเฟกต์ตอนกดช่องกรอกข้อมูล */
+        input[type="text"]:focus, input[type="password"]:focus {
+            border-color: #007bff;
+            outline: none;
+            background-color: #fff;
+            box-shadow: 0 0 0 4px rgba(0,123,255,0.1);
+        }
+
+        button { 
+            border: none; 
+            padding: 14px 20px; 
+            font-size: 16px; 
+            font-weight: 500;
+            font-family: 'Prompt', sans-serif;
+            border-radius: 14px; 
+            cursor: pointer; 
+            width: 100%; 
+            margin-bottom: 12px; 
+            color: white;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        /* เอฟเฟกต์ปุ่มยุบตัวเวลาโดนกด */
+        button:active { transform: scale(0.96); }
+        button:disabled { background: #cccccc !important; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        /* ตกแต่งสีปุ่มแบบ Gradient */
+        .btn-primary { background: linear-gradient(135deg, #007bff, #0056b3); } 
+        .btn-primary:hover { box-shadow: 0 6px 20px rgba(0,123,255,0.3); }
+        
+        .btn-success { background: linear-gradient(135deg, #28a745, #20c997); } 
+        .btn-success:hover { box-shadow: 0 6px 20px rgba(40,167,69,0.3); }
+        
+        .btn-warning { background: linear-gradient(135deg, #ffc107, #ff9800); color: #fff; } 
+        .btn-warning:hover { box-shadow: 0 6px 20px rgba(255,193,7,0.3); }
+        
+        .btn-danger { background: linear-gradient(135deg, #dc3545, #c82333); margin-top: 15px; } 
+        .btn-danger:hover { box-shadow: 0 6px 20px rgba(220,53,69,0.3); }
+        
+        #lineLoginBtn { background: linear-gradient(135deg, #06C755, #05a546) !important; font-weight: 600; letter-spacing: 0.5px; }
+        
+        #statusText, #appStatus { font-size: 14px; margin-bottom: 15px; min-height: 20px; font-weight: 400; }
+        
+        #map { height: 320px; width: 100%; border-radius: 16px; display: none; margin-top: 15px; z-index: 1; border: 2px solid #f0f0f0; }
+        
+        .custom-photo-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 5px 15px rgba(0,0,0,0.4); object-fit: cover; }
+        
+        .hidden { display: none !important; }
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
 
+    <!-- เอาคลาส hidden ออก เพื่อให้โชว์หน้าล็อกอินทันทีที่เปิดเว็บ -->
     <div class="container" id="mainContainer">
         <!-- 1. หน้าเข้าสู่ระบบ -->
         <div id="authSection">
@@ -54,6 +124,7 @@
             <button id="loginBtn" class="btn-primary">เข้าสู่ระบบ</button>
             <button id="registerBtn" class="btn-success">สมัครสมาชิกใหม่</button>
 
+            <!-- เพิ่มเส้นคั่น และปุ่มล็อกอินด้วย LINE -->
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
             <button id="lineLoginBtn" style="background-color: #06C755; color: white; font-weight: bold;">💬 ล็อกอินด้วย LINE</button>
         </div>
@@ -99,61 +170,12 @@
         
         let liffUserId = ""; 
         let myMap = null, currentUser = "", currentTripId = null;
-        let routeCoordinates = []; 
-        let routingControl = null; // 🌟 ใช้ตัวนี้ควบคุมเส้นทางตามถนนแทน
+        let routeCoordinates = [], routeLine = null;
 
-        // --- 🌟 ฟังก์ชันระบบความจำ (Local Storage) ---
-        function saveTripState() {
-            localStorage.setItem('savedTripId', currentTripId);
-            localStorage.setItem('savedCoordinates', JSON.stringify(routeCoordinates));
-        }
-
-        function clearTripState() {
-            localStorage.removeItem('savedTripId');
-            localStorage.removeItem('savedCoordinates');
-        }
-
-        function restoreTripState() {
-            const savedTripId = localStorage.getItem('savedTripId');
-            if (savedTripId) {
-                currentTripId = savedTripId;
-                routeCoordinates = JSON.parse(localStorage.getItem('savedCoordinates') || '[]');
-                
-                // สลับปุ่ม
-                document.getElementById('startTripBtn').classList.add('hidden');
-                document.getElementById('tripControls').classList.remove('hidden');
-                
-                // ถ้ามีพิกัดค้างอยู่ ให้วาดแผนที่ใหม่เลย
-                if (routeCoordinates.length > 0) {
-                    document.getElementById('map').style.display = 'block';
-                    const lastPos = routeCoordinates[routeCoordinates.length - 1];
-                    
-                    if (!myMap) {
-                        myMap = L.map('map').setView([lastPos[0], lastPos[1]], 15);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(myMap);
-                    }
-
-                    // ปักหมุดย้อนหลัง (แบบมาตรฐาน)
-                    routeCoordinates.forEach((coord, i) => {
-                        L.marker([coord[0], coord[1]]).addTo(myMap).bindPopup("จุดที่ " + (i + 1));
-                    });
-
-                    // วาดเส้นทางตามถนนย้อนหลัง
-                    if (routeCoordinates.length > 1) {
-                        routingControl = L.Routing.control({
-                            waypoints: routeCoordinates.map(c => L.latLng(c[0], c[1])),
-                            routeWhileDragging: false, addWaypoints: false, show: false,
-                            createMarker: function() { return null; }, // ปิดหมุดอัตโนมัติของตัววาดเส้น
-                            lineOptions: { styles: [{color: 'blue', weight: 4}] }
-                        }).addTo(myMap);
-                    }
-                    document.getElementById('appStatus').innerText = "🔄 โหลดเส้นทางที่บันทึกไว้ล่าสุดสำเร็จ!";
-                }
-            }
-        }
-
+        // --- ระบบ LIFF แอบทำงานอยู่หลังบ้านเงียบๆ ---
         async function initializeLiff() {
             try {
+                // 🛑 ใส่ LIFF ID ของคุณ
                 await liff.init({ liffId: "2011078075-i7j9DKxk" }); 
                 
                 if (liff.isLoggedIn()) {
@@ -166,9 +188,8 @@
                     document.getElementById('displayUsername').innerText = currentUser;
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('appSection').classList.remove('hidden');
-                    
-                    restoreTripState(); // 🌟 โหลดข้อมูลที่จำไว้ทันทีที่เข้าสู่ระบบสำเร็จ
                 } 
+                // ไม่ต้องแสดงหน้าจอโหลดแล้ว ปล่อยให้มันทำงานไป
             } catch (err) {
                 console.log("LIFF Init Error: ", err.message);
             }
@@ -177,7 +198,9 @@
         initializeLiff();
 
         document.getElementById('lineLoginBtn').addEventListener('click', () => {
-            if (!liff.isLoggedIn()) liff.login(); 
+            if (!liff.isLoggedIn()) {
+                liff.login(); 
+            }
         });
 
         const callAPI = (payload, callback) => {
@@ -198,8 +221,6 @@
                     document.getElementById('displayUsername').innerText = currentUser;
                     document.getElementById('authSection').classList.add('hidden'); 
                     document.getElementById('appSection').classList.remove('hidden');
-                    
-                    restoreTripState(); // 🌟 โหลดข้อมูลที่จำไว้
                 } else {
                     document.getElementById('statusText').innerText = data.message;
                 }
@@ -210,7 +231,9 @@
         document.getElementById('registerBtn').addEventListener('click', () => handleAuth('register'));
         
         document.getElementById('logoutBtn').addEventListener('click', () => { 
-            if (liff.isLoggedIn()) liff.logout();
+            if (liff.isLoggedIn()) {
+                liff.logout();
+            }
             location.reload(); 
         });
         
@@ -236,10 +259,7 @@
         document.getElementById('startTripBtn').addEventListener('click', () => {
             currentTripId = "TRIP_" + new Date().getTime(); 
             routeCoordinates = []; 
-            clearTripState(); // เริ่มใหม่ ล้างความจำเก่าทิ้ง
-            
-            if(routingControl && myMap) myMap.removeControl(routingControl);
-            routingControl = null;
+            if(routeLine && myMap) myMap.removeLayer(routeLine);
             
             document.getElementById('startTripBtn').classList.add('hidden');
             document.getElementById('tripControls').classList.remove('hidden');
@@ -247,9 +267,10 @@
 
             callAPI({ action: 'notify', type: 'start', username: currentUser, tripId: currentTripId }, (data) => {
                 if(data.status === 'success') {
-                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!";
+                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!<br>ระบบส่งข้อความแจ้งเตือนเข้า LINE เรียบร้อย";
                     document.getElementById('appStatus').style.color = "#28a745";
-                    saveTripState(); // 🌟 เซฟสถานะ
+                } else {
+                    document.getElementById('appStatus').innerHTML = "เริ่มการเดินทางแล้ว (แจ้งเตือน LINE ไม่สำเร็จ: " + data.message + ")";
                 }
             });
         });
@@ -272,20 +293,9 @@
                 }
 
                 routeCoordinates.push([lat, lng]);
-                saveTripState(); // 🌟 อัปเดตความจำทุกครั้งที่เช็คอิน
-
-                // 🌟 ระบบวาดเส้นตามถนน
                 if(routeCoordinates.length > 1) {
-                    if(routingControl) {
-                        routingControl.setWaypoints(routeCoordinates.map(c => L.latLng(c[0], c[1])));
-                    } else {
-                        routingControl = L.Routing.control({
-                            waypoints: routeCoordinates.map(c => L.latLng(c[0], c[1])),
-                            routeWhileDragging: false, addWaypoints: false, show: false,
-                            createMarker: function() { return null; },
-                            lineOptions: { styles: [{color: 'blue', weight: 4}] }
-                        }).addTo(myMap);
-                    }
+                    if(routeLine) myMap.removeLayer(routeLine);
+                    routeLine = L.polyline(routeCoordinates, {color: 'blue', weight: 4}).addTo(myMap);
                 }
 
                 const sendCheckinData = (base64) => {
@@ -321,10 +331,8 @@
                 callAPI({ action: 'notify', type: 'end', username: currentUser, tripId: currentTripId, totalStops: routeCoordinates.length }, () => {
                     document.getElementById('appStatus').innerText = "";
 
-                    // ซูมภาพรวม (สำหรับ Routing อาจจะตัองคำนวณ bounds ใหม่นิดหน่อย แต่เราใช้พิกัดที่มีไปก่อน)
-                    if (routeCoordinates.length > 1 && myMap) {
-                         const bounds = L.latLngBounds(routeCoordinates.map(c => L.latLng(c[0], c[1])));
-                         myMap.fitBounds(bounds, { padding: [40, 40] });
+                    if (routeLine && myMap) {
+                        myMap.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
                     }
 
                     document.getElementById('summaryStops').innerText = routeCoordinates.length;
@@ -332,7 +340,6 @@
                     document.getElementById('summarySection').classList.remove('hidden');
 
                     currentTripId = null;
-                    clearTripState(); // 🌟 เคลียร์ความจำเมื่อจบการเดินทางสมบูรณ์
                 });
             }
         });
@@ -345,14 +352,10 @@
             
             if (myMap) {
                 myMap.eachLayer((layer) => {
-                    if (layer instanceof L.Marker) {
+                    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
                         myMap.removeLayer(layer);
                     }
                 });
-                if(routingControl) {
-                    myMap.removeControl(routingControl);
-                    routingControl = null;
-                }
             }
         });
     </script>
