@@ -28,20 +28,12 @@
         #map { height: 300px; width: 100%; border-radius: 8px; display: none; margin-top: 15px; z-index: 1; }
         .custom-photo-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5); object-fit: cover; }
         .hidden { display: none !important; }
-        
-        /* หน้าจอโหลด LIFF */
-        #liffLoading { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;}
     </style>
 </head>
 <body>
 
-    <!-- หน้าจอรอโหลดระบบ LINE -->
-    <div id="liffLoading">
-        <h2 style="color:#00c300;">LINE App</h2>
-        <p>กำลังเชื่อมต่อระบบเพื่อตรวจสอบสิทธิ์...</p>
-    </div>
-
-    <div class="container hidden" id="mainContainer">
+    <!-- เอาคลาส hidden ออก เพื่อให้โชว์หน้าล็อกอินทันทีที่เปิดเว็บ (ไม่มีหน้าจอโหลด LINE แล้ว!) -->
+    <div class="container" id="mainContainer">
         <!-- 1. หน้าเข้าสู่ระบบ -->
         <div id="authSection">
             <h2>🔐 เข้าสู่ระบบ</h2>
@@ -97,48 +89,39 @@
     </div>
 
     <script>
-        // 🛑 1. ใส่ Web App URL ของคุณที่นี่
+        // 🛑 ใส่ Web App URL ของคุณที่นี่
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvEJM9M3XdRXUmwrzBu0YDmH-Ft1B-nbbwrW1KWfAHGB9jnBzam_if0VlpAOr0P_hjQg/exec';
         
         let liffUserId = ""; 
         let myMap = null, currentUser = "", currentTripId = null;
         let routeCoordinates = [], routeLine = null;
 
-        // --- ระบบ LIFF เริ่มทำงาน ---
+        // --- ระบบ LIFF แอบทำงานอยู่หลังบ้านเงียบๆ ---
         async function initializeLiff() {
             try {
                 // 🛑 ใส่ LIFF ID ของคุณ
                 await liff.init({ liffId: "2011078075-i7j9DKxk" }); 
                 
                 if (liff.isLoggedIn()) {
-                    // ดึงโปรไฟล์ LINE ทันที
                     const profile = await liff.getProfile();
                     liffUserId = profile.userId; 
-                    currentUser = profile.displayName; // ใช้ชื่อ LINE เป็นชื่อผู้ใช้เลย
+                    currentUser = profile.displayName; 
 
-                    // แอบลงทะเบียนในพื้นหลัง เพื่อให้บอทรู้จักและส่งแจ้งเตือนได้
                     callAPI({ action: 'register', username: currentUser, password: 'LINE_LOGIN', lineUserId: liffUserId }, () => {});
 
-                    // ข้ามหน้าล็อกอิน ไปหน้าแอปหลักทันที
                     document.getElementById('displayUsername').innerText = currentUser;
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('appSection').classList.remove('hidden');
                 } 
-                
-                document.getElementById('liffLoading').style.display = 'none';
-                document.getElementById('mainContainer').classList.remove('hidden');
-                
             } catch (err) {
-                document.getElementById('liffLoading').innerHTML = `<p style="color:red;">การเชื่อมต่อ LIFF ล้มเหลว: ${err.message}</p>`;
+                console.log("LIFF Init Error: ", err.message);
             }
         }
         
         initializeLiff();
 
-        // 🛑 Event สำหรับปุ่ม "ล็อกอินด้วย LINE"
         document.getElementById('lineLoginBtn').addEventListener('click', () => {
             if (!liff.isLoggedIn()) {
-                // คำสั่งนี้จะเด้งพาผู้ใช้ไปหน้ากดยอมรับสิทธิ์ของ LINE อัตโนมัติ
                 liff.login(); 
             }
         });
@@ -170,7 +153,6 @@
         document.getElementById('loginBtn').addEventListener('click', () => handleAuth('login'));
         document.getElementById('registerBtn').addEventListener('click', () => handleAuth('register'));
         
-        // อัปเดตปุ่มออกจากระบบให้เตะออกจาก LINE Login ด้วย
         document.getElementById('logoutBtn').addEventListener('click', () => { 
             if (liff.isLoggedIn()) {
                 liff.logout();
