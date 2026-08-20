@@ -8,6 +8,10 @@
     <!-- นำเข้าแผนที่ Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- 🌟 เพิ่มปลั๊กอิน Leaflet Routing Machine สำหรับลากเส้นตามถนน -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     
     <!-- นำเข้า LIFF SDK สำหรับเชื่อมต่อ LINE -->
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -28,11 +32,13 @@
         #map { height: 300px; width: 100%; border-radius: 8px; display: none; margin-top: 15px; z-index: 1; }
         .custom-photo-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5); object-fit: cover; }
         .hidden { display: none !important; }
+
+        /* 🌟 ซ่อนกล่องข้อความบอกทางของ Routing Machine ให้แผนที่ดูสะอาด */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
 
-    <!-- เอาคลาส hidden ออก เพื่อให้โชว์หน้าล็อกอินทันทีที่เปิดเว็บ (ไม่มีหน้าจอโหลด LINE แล้ว!) -->
     <div class="container" id="mainContainer">
         <!-- 1. หน้าเข้าสู่ระบบ -->
         <div id="authSection">
@@ -48,7 +54,6 @@
             <button id="loginBtn" class="btn-primary">เข้าสู่ระบบ</button>
             <button id="registerBtn" class="btn-success">สมัครสมาชิกใหม่</button>
 
-            <!-- เพิ่มเส้นคั่น และปุ่มล็อกอินด้วย LINE -->
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
             <button id="lineLoginBtn" style="background-color: #06C755; color: white; font-weight: bold;">💬 ล็อกอินด้วย LINE</button>
         </div>
@@ -94,12 +99,61 @@
         
         let liffUserId = ""; 
         let myMap = null, currentUser = "", currentTripId = null;
-        let routeCoordinates = [], routeLine = null;
+        let routeCoordinates = []; 
+        let routingControl = null; // 🌟 ใช้ตัวนี้ควบคุมเส้นทางตามถนนแทน
 
-        // --- ระบบ LIFF แอบทำงานอยู่หลังบ้านเงียบๆ ---
+        // --- 🌟 ฟังก์ชันระบบความจำ (Local Storage) ---
+        function saveTripState() {
+            localStorage.setItem('savedTripId', currentTripId);
+            localStorage.setItem('savedCoordinates', JSON.stringify(routeCoordinates));
+        }
+
+        function clearTripState() {
+            localStorage.removeItem('savedTripId');
+            localStorage.removeItem('savedCoordinates');
+        }
+
+        function restoreTripState() {
+            const savedTripId = localStorage.getItem('savedTripId');
+            if (savedTripId) {
+                currentTripId = savedTripId;
+                routeCoordinates = JSON.parse(localStorage.getItem('savedCoordinates') || '[]');
+                
+                // สลับปุ่ม
+                document.getElementById('startTripBtn').classList.add('hidden');
+                document.getElementById('tripControls').classList.remove('hidden');
+                
+                // ถ้ามีพิกัดค้างอยู่ ให้วาดแผนที่ใหม่เลย
+                if (routeCoordinates.length > 0) {
+                    document.getElementById('map').style.display = 'block';
+                    const lastPos = routeCoordinates[routeCoordinates.length - 1];
+                    
+                    if (!myMap) {
+                        myMap = L.map('map').setView([lastPos[0], lastPos[1]], 15);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(myMap);
+                    }
+
+                    // ปักหมุดย้อนหลัง (แบบมาตรฐาน)
+                    routeCoordinates.forEach((coord, i) => {
+                        L.marker([coord[0], coord[1]]).addTo(myMap).bindPopup("จุดที่ " + (i + 1));
+                    });
+
+                    // วาดเส้นทางตามถนนย้อนหลัง
+                    if (routeCoordinates.length > 1) {
+                        routingControl = L.Routing.control({
+                            waypoints: routeCoordinates.map(c => L.latLng(c[0], c[1])),
+                            routeWhileDragging: false, addWaypoints: false, show: false,
+                            createMarker: function() { return null; }, // ปิดหมุดอัตโนมัติของตัววาดเส้น
+                            lineOptions: { styles: [{color: 'blue', weight: 4}] }
+                        }).addTo(myMap);
+                    }
+                    document.getElementById('appStatus').innerText = "🔄 โหลดเส้นทางที่บันทึกไว้ล่าสุดสำเร็จ!";
+                }
+            }
+        }
+
         async function initializeLiff() {
             try {
-                // 🛑 ใส่ LIFF ID ของคุณ
                 await liff.init({ liffId: "2011078075-i7j9DKxk" }); 
                 
                 if (liff.isLoggedIn()) {
@@ -112,6 +166,8 @@
                     document.getElementById('displayUsername').innerText = currentUser;
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('appSection').classList.remove('hidden');
+                    
+                    restoreTripState(); // 🌟 โหลดข้อมูลที่จำไว้ทันทีที่เข้าสู่ระบบสำเร็จ
                 } 
             } catch (err) {
                 console.log("LIFF Init Error: ", err.message);
@@ -121,9 +177,7 @@
         initializeLiff();
 
         document.getElementById('lineLoginBtn').addEventListener('click', () => {
-            if (!liff.isLoggedIn()) {
-                liff.login(); 
-            }
+            if (!liff.isLoggedIn()) liff.login(); 
         });
 
         const callAPI = (payload, callback) => {
@@ -144,6 +198,8 @@
                     document.getElementById('displayUsername').innerText = currentUser;
                     document.getElementById('authSection').classList.add('hidden'); 
                     document.getElementById('appSection').classList.remove('hidden');
+                    
+                    restoreTripState(); // 🌟 โหลดข้อมูลที่จำไว้
                 } else {
                     document.getElementById('statusText').innerText = data.message;
                 }
@@ -154,9 +210,7 @@
         document.getElementById('registerBtn').addEventListener('click', () => handleAuth('register'));
         
         document.getElementById('logoutBtn').addEventListener('click', () => { 
-            if (liff.isLoggedIn()) {
-                liff.logout();
-            }
+            if (liff.isLoggedIn()) liff.logout();
             location.reload(); 
         });
         
@@ -182,7 +236,10 @@
         document.getElementById('startTripBtn').addEventListener('click', () => {
             currentTripId = "TRIP_" + new Date().getTime(); 
             routeCoordinates = []; 
-            if(routeLine && myMap) myMap.removeLayer(routeLine);
+            clearTripState(); // เริ่มใหม่ ล้างความจำเก่าทิ้ง
+            
+            if(routingControl && myMap) myMap.removeControl(routingControl);
+            routingControl = null;
             
             document.getElementById('startTripBtn').classList.add('hidden');
             document.getElementById('tripControls').classList.remove('hidden');
@@ -190,10 +247,9 @@
 
             callAPI({ action: 'notify', type: 'start', username: currentUser, tripId: currentTripId }, (data) => {
                 if(data.status === 'success') {
-                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!<br>ระบบส่งข้อความแจ้งเตือนเข้า LINE เรียบร้อย";
+                    document.getElementById('appStatus').innerHTML = "🚀 เริ่มการเดินทางแล้ว!";
                     document.getElementById('appStatus').style.color = "#28a745";
-                } else {
-                    document.getElementById('appStatus').innerHTML = "เริ่มการเดินทางแล้ว (แจ้งเตือน LINE ไม่สำเร็จ: " + data.message + ")";
+                    saveTripState(); // 🌟 เซฟสถานะ
                 }
             });
         });
@@ -216,9 +272,20 @@
                 }
 
                 routeCoordinates.push([lat, lng]);
+                saveTripState(); // 🌟 อัปเดตความจำทุกครั้งที่เช็คอิน
+
+                // 🌟 ระบบวาดเส้นตามถนน
                 if(routeCoordinates.length > 1) {
-                    if(routeLine) myMap.removeLayer(routeLine);
-                    routeLine = L.polyline(routeCoordinates, {color: 'blue', weight: 4}).addTo(myMap);
+                    if(routingControl) {
+                        routingControl.setWaypoints(routeCoordinates.map(c => L.latLng(c[0], c[1])));
+                    } else {
+                        routingControl = L.Routing.control({
+                            waypoints: routeCoordinates.map(c => L.latLng(c[0], c[1])),
+                            routeWhileDragging: false, addWaypoints: false, show: false,
+                            createMarker: function() { return null; },
+                            lineOptions: { styles: [{color: 'blue', weight: 4}] }
+                        }).addTo(myMap);
+                    }
                 }
 
                 const sendCheckinData = (base64) => {
@@ -254,8 +321,10 @@
                 callAPI({ action: 'notify', type: 'end', username: currentUser, tripId: currentTripId, totalStops: routeCoordinates.length }, () => {
                     document.getElementById('appStatus').innerText = "";
 
-                    if (routeLine && myMap) {
-                        myMap.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                    // ซูมภาพรวม (สำหรับ Routing อาจจะตัองคำนวณ bounds ใหม่นิดหน่อย แต่เราใช้พิกัดที่มีไปก่อน)
+                    if (routeCoordinates.length > 1 && myMap) {
+                         const bounds = L.latLngBounds(routeCoordinates.map(c => L.latLng(c[0], c[1])));
+                         myMap.fitBounds(bounds, { padding: [40, 40] });
                     }
 
                     document.getElementById('summaryStops').innerText = routeCoordinates.length;
@@ -263,6 +332,7 @@
                     document.getElementById('summarySection').classList.remove('hidden');
 
                     currentTripId = null;
+                    clearTripState(); // 🌟 เคลียร์ความจำเมื่อจบการเดินทางสมบูรณ์
                 });
             }
         });
@@ -275,10 +345,14 @@
             
             if (myMap) {
                 myMap.eachLayer((layer) => {
-                    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                    if (layer instanceof L.Marker) {
                         myMap.removeLayer(layer);
                     }
                 });
+                if(routingControl) {
+                    myMap.removeControl(routingControl);
+                    routingControl = null;
+                }
             }
         });
     </script>
