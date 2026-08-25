@@ -78,7 +78,6 @@
 
             <div class="divider">หรือเข้าสู่ระบบด้วย</div>
             
-            <!-- ปุ่ม Google Login -->
             <div id="googleBtnContainer" style="margin-bottom: 12px; display: flex; justify-content: center;"></div>
             
             <button id="lineLoginBtn" onclick="loginWithLine()">💬 ล็อกอินด้วย LINE</button>
@@ -133,7 +132,7 @@
 
             <button id="startTripBtn" class="btn-success" style="padding: 15px; font-size: 18px;" onclick="startTrip()">🚗 เริ่มการเดินทาง</button>
 
-            <!-- 🌟 อัปเดต: เพิ่มช่องกรอกชื่อสถานที่ -->
+            <!-- ช่องกรอกชื่อสถานที่ -->
             <div id="tripControls" style="display: none;">
                 <div style="margin-bottom: 15px; text-align: left; background: #e9ecef; padding: 15px; border-radius: 12px;">
                     <label style="font-weight: bold; font-size: 14px; display: block; margin-bottom: 5px;">📝 ชื่อสถานที่ (ถ้ามี)</label>
@@ -391,7 +390,6 @@
             });
         }
 
-        // 🌟 อัปเดต: ฟังก์ชันเช็คอิน (รวมการดึงชื่อสถานที่)
         function checkIn() {
             if (!navigator.geolocation) return;
             document.getElementById('appStatus').innerText = "📍 กำลังหาพิกัด...";
@@ -425,11 +423,9 @@
             }, null, { enableHighAccuracy: true });
         }
 
-        // 🌟 อัปเดต: ส่งข้อมูลชื่อสถานที่ไปหลังบ้าน
         function sendCheckin(lat, lng, base64, locName) {
             callAPI({ action: 'checkin', email: currentUserEmail, tripId: currentTripId, lat: lat, lng: lng, imageBase64: base64, locationName: locName }, () => {
                 document.getElementById('appStatus').innerText = `✅ บันทึกจุดที่ ${routeCoordinates.length} สำเร็จ!`;
-                // เคลียร์ช่องพิมพ์ชื่อ
                 document.getElementById('locationNameInput').value = "";
                 document.getElementById('cameraInput').value = ""; 
             });
@@ -460,14 +456,14 @@
         }
 
         // ==========================================
-        // ระบบ Dashboard สาธารณะ (Public Routes)
+        // ระบบ Dashboard สาธารณะ (วาดเส้นทางตามถนนจริง)
         // ==========================================
         function loadPublicDashboard() {
             switchSection('publicSection');
             document.getElementById('publicStatus').innerText = "กำลังโหลดข้อมูลเส้นทาง...";
             
             if(!publicMap) {
-                // เซ็ตจุดศูนย์กลางที่จังหวัดศรีสะเกษ
+                // ศูนย์กลางพิกัดศรีสะเกษ
                 publicMap = L.map('publicMap').setView([15.1186, 104.3220], 10);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(publicMap);
             }
@@ -476,18 +472,33 @@
                 if(res.status === 'success') {
                     document.getElementById('publicStatus').innerText = `พบข้อมูล ${Object.keys(res.data).length} เส้นทาง`;
                     
-                    publicMap.eachLayer((layer) => { if (layer instanceof L.Polyline || layer instanceof L.Marker) publicMap.removeLayer(layer); });
+                    // เคลียร์เส้นและหมุดเก่าบนแผนที่
+                    publicMap.eachLayer((layer) => { 
+                        if (layer instanceof L.Polyline || layer instanceof L.Marker) publicMap.removeLayer(layer); 
+                        if (layer._routing) publicMap.removeControl(layer);
+                    });
 
-                    let colors = ['red', 'blue', 'green', 'purple', 'orange'];
+                    let colors = ['#dc3545', '#007bff', '#28a745', '#6f42c1', '#fd7e14'];
                     let idx = 0;
                     
                     for (let tripId in res.data) {
                         let coords = res.data[tripId].coordinates;
                         if(coords.length > 1) {
                             let color = colors[idx % colors.length]; idx++;
-                            L.polyline(coords, {color: color, weight: 4, opacity: 0.7}).addTo(publicMap);
-                            L.circleMarker(coords[0], {color: 'black', fillColor: 'white', fillOpacity: 1}).addTo(publicMap).bindPopup("จุดเริ่มต้น");
-                            L.circleMarker(coords[coords.length-1], {color: 'black', fillColor: color, fillOpacity: 1}).addTo(publicMap).bindPopup("จุดสิ้นสุด");
+                            
+                            // วาดเส้นทางเลี้ยวตามโค้งถนนด้วย Leaflet Routing Machine
+                            L.Routing.control({
+                                waypoints: coords.map(c => L.latLng(c[0], c[1])),
+                                routeWhileDragging: false, 
+                                addWaypoints: false, 
+                                show: false, // ซ่อนกล่องข้อความบอกทาง
+                                createMarker: function() { return null; }, // ไม่ต้องสร้างหมุดซ้ำ
+                                lineOptions: { styles: [{color: color, weight: 5, opacity: 0.8}] }
+                            }).addTo(publicMap);
+                            
+                            // ปักหมุดเฉพาะจุดเริ่มต้นและจุดสิ้นสุด
+                            L.circleMarker(coords[0], {color: 'black', fillColor: 'white', fillOpacity: 1, radius: 6}).addTo(publicMap).bindPopup("จุดเริ่มต้น");
+                            L.circleMarker(coords[coords.length-1], {color: 'black', fillColor: color, fillOpacity: 1, radius: 6}).addTo(publicMap).bindPopup("จุดสิ้นสุด");
                         }
                     }
                 }
