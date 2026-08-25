@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Travel App - ระบบบันทึกการเดินทาง</title>
     
-    <!-- นำเข้าแผนที่ Leaflet และ Routing Machine -->
+    <!-- Leaflet & Routing Machine -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
-    <!-- นำเข้า LIFF SDK สำหรับ LINE และ Google Identity Services -->
+    <!-- LIFF & Google Sign-In -->
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
@@ -19,19 +19,14 @@
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 
         body { font-family: 'Prompt', sans-serif; text-align: center; padding: 20px; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); min-height: 100vh; margin: 0; color: #2c3e50; }
-        
         .container { max-width: 450px; margin: 0 auto; background: rgba(255, 255, 255, 0.95); padding: 35px 25px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.15); backdrop-filter: blur(10px); }
-        
         h2 { font-weight: 600; color: #1a252f; margin-top: 0; margin-bottom: 20px; }
         p.desc { font-size: 14px; color: #666; margin-bottom: 20px; }
-        
         input[type="text"], input[type="email"], input[type="password"] { width: 100%; padding: 14px 16px; margin-bottom: 15px; border: 2px solid #e1e5eb; border-radius: 12px; box-sizing: border-box; font-family: 'Prompt', sans-serif; font-size: 15px; background-color: #f8f9fa; transition: all 0.3s ease; }
         input:focus { border-color: #007bff; outline: none; background-color: #fff; box-shadow: 0 0 0 4px rgba(0,123,255,0.1); }
-        
         button { border: none; padding: 14px 20px; font-size: 16px; font-weight: 500; font-family: 'Prompt', sans-serif; border-radius: 14px; cursor: pointer; width: 100%; margin-bottom: 12px; color: white; transition: all 0.2s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         button:active { transform: scale(0.96); }
         button:disabled { background: #cccccc !important; cursor: not-allowed; box-shadow: none; transform: none; }
-        
         .btn-primary { background: linear-gradient(135deg, #007bff, #0056b3); } 
         .btn-success { background: linear-gradient(135deg, #28a745, #20c997); } 
         .btn-warning { background: linear-gradient(135deg, #ffc107, #ff9800); color: #fff; } 
@@ -39,18 +34,13 @@
         .btn-dark { background: linear-gradient(135deg, #343a40, #1d2124); } 
         .btn-link { background: none; color: #007bff; box-shadow: none; padding: 5px; margin-bottom: 5px; font-size: 14px; text-decoration: underline; }
         .btn-link:hover { color: #0056b3; background: none; box-shadow: none; }
-        
         #lineLoginBtn { background: linear-gradient(135deg, #06C755, #05a546) !important; font-weight: 600; letter-spacing: 0.5px; }
-        
         .status-msg { font-size: 14px; margin-bottom: 15px; min-height: 20px; font-weight: 400; color: #dc3545; }
-        
         #map, #publicMap { height: 350px; width: 100%; border-radius: 16px; margin-top: 15px; border: 2px solid #f0f0f0; z-index: 1; }
         .custom-photo-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 5px 15px rgba(0,0,0,0.4); object-fit: cover; }
         .leaflet-routing-container { display: none !important; }
-        
         .app-section { display: none; animation: fadeIn 0.3s ease-in-out; }
         .app-section.active { display: block; }
-        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .divider { display: flex; align-items: center; text-align: center; margin: 20px 0; color: #aaa; font-size: 14px; }
         .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #ddd; }
@@ -61,83 +51,60 @@
 <body>
 
     <div class="container">
-        
-        <!-- ============================================== -->
-        <!-- 1. หน้าเข้าสู่ระบบ (Login Section) -->
-        <!-- ============================================== -->
+        <!-- 1. หน้า Login -->
         <div id="loginSection" class="app-section active">
             <h2>📍 เข้าสู่ระบบ / สมัครสมาชิก</h2>
             <p id="loginStatus" class="status-msg"></p>
-            
             <input type="email" id="emailInput" placeholder="อีเมล (Email)">
             <input type="password" id="passwordInput" placeholder="รหัสผ่าน (Password)">
-            
             <button class="btn-primary" onclick="handleAuth('login')">เข้าสู่ระบบ (Login)</button>
             <button class="btn-success" onclick="handleAuth('register')">สมัครสมาชิกใหม่</button>
             <button class="btn-link" onclick="switchSection('forgotSection')">ลืมรหัสผ่านใช่หรือไม่?</button>
-
             <div class="divider">หรือเข้าสู่ระบบด้วย</div>
-            
             <div id="googleBtnContainer" style="margin-bottom: 12px; display: flex; justify-content: center;"></div>
-            
             <button id="lineLoginBtn" onclick="loginWithLine()">💬 ล็อกอินด้วย LINE</button>
-            
             <hr style="border: 0; border-top: 1px dashed #ddd; margin: 25px 0;">
             <button class="btn-dark" onclick="loadPublicDashboard()">🌍 ดูเส้นทางสาธารณะ (ไม่ระบุตัวตน)</button>
         </div>
 
-        <!-- ============================================== -->
-        <!-- 2. หน้าลืมรหัสผ่าน (Forgot Password) -->
-        <!-- ============================================== -->
+        <!-- 2. หน้าลืมรหัสผ่าน -->
         <div id="forgotSection" class="app-section">
             <h2>🔑 ลืมรหัสผ่าน</h2>
             <p class="desc">กรอกอีเมลของคุณเพื่อรับรหัส OTP สำหรับรีเซ็ตรหัสผ่าน</p>
             <p id="forgotStatus" class="status-msg"></p>
-            
             <div id="otpRequestStep">
                 <input type="email" id="resetEmail" placeholder="ใส่อีเมลที่ลงทะเบียนไว้">
                 <button class="btn-primary" onclick="requestOTP()">📩 ส่งรหัส OTP</button>
             </div>
-
             <div id="otpResetStep" style="display: none;">
                 <input type="text" id="otpCode" placeholder="รหัส OTP 6 หลัก" maxlength="6">
                 <input type="password" id="newPassword" placeholder="ตั้งรหัสผ่านใหม่">
                 <button class="btn-success" onclick="resetPassword()">✅ ยืนยันเปลี่ยนรหัสผ่าน</button>
             </div>
-            
             <button class="btn-link" onclick="switchSection('loginSection')">กลับไปหน้าเข้าสู่ระบบ</button>
         </div>
 
-        <!-- ============================================== -->
-        <!-- 3. หน้าเชื่อมบัญชี (Link Account) -->
-        <!-- ============================================== -->
+        <!-- 3. หน้าเชื่อมบัญชี -->
         <div id="linkSection" class="app-section">
             <h2>🔗 เชื่อมต่อบัญชี</h2>
-            <p class="desc">ดูเหมือนว่าบัญชี Social ของคุณยังไม่เคยผูกกับระบบ<br>กรุณาสร้างหรือผูกกับอีเมลก่อนครับ</p>
+            <p class="desc">บัญชี Social นี้ยังไม่เคยผูกกับระบบ<br>กรุณากรอกอีเมลเพื่อผูกบัญชี</p>
             <p id="linkStatus" class="status-msg"></p>
-
             <input type="email" id="linkEmail" placeholder="อีเมล (Email)">
             <input type="password" id="linkPassword" placeholder="รหัสผ่าน (Password)">
-            
             <button class="btn-primary" onclick="linkAccount()">ผูกบัญชี & เข้าสู่ระบบ</button>
             <button class="btn-link" onclick="switchSection('loginSection')">ยกเลิก</button>
         </div>
 
-        <!-- ============================================== -->
-        <!-- 4. หน้าแอปพลิเคชันหลัก (App Section) -->
-        <!-- ============================================== -->
+        <!-- 4. หน้าแอปหลัก -->
         <div id="appSection" class="app-section">
             <h2>📍 ระบบติดตามการเดินทาง</h2>
             <p style="text-align: left; margin-bottom: 20px;">อีเมลผู้ใช้: <strong id="displayEmail" style="color:#007bff;"></strong></p>
-
             <button id="startTripBtn" class="btn-success" style="padding: 15px; font-size: 18px;" onclick="startTrip()">🚗 เริ่มการเดินทาง</button>
 
-            <!-- ช่องกรอกชื่อสถานที่ -->
             <div id="tripControls" style="display: none;">
                 <div style="margin-bottom: 15px; text-align: left; background: #e9ecef; padding: 15px; border-radius: 12px;">
                     <label style="font-weight: bold; font-size: 14px; display: block; margin-bottom: 5px;">📝 ชื่อสถานที่ (ถ้ามี)</label>
                     <input type="text" id="locationNameInput" placeholder="เช่น ร้านกาแฟ, จุดชมวิว..." style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-family: 'Prompt', sans-serif; box-sizing: border-box;">
-                    
                     <label style="font-weight: bold; font-size: 14px; display: block; margin-bottom: 5px;">📸 ถ่ายรูปสถานที่</label>
                     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="width: 100%;">
                 </div>
@@ -148,7 +115,6 @@
             <p id="appStatus" class="status-msg" style="color: #28a745;"></p>
             <div id="map" style="display: none;"></div>
 
-            <!-- ส่วนสรุปผล -->
             <div id="summarySection" style="display: none; margin-top: 15px; background: white; padding: 25px 20px; border-radius: 10px; box-shadow: 0 -5px 20px rgba(0,0,0,0.15);">
                 <p style="font-size: 14px; color: gray; margin: 0;">🎉 สรุปเส้นทางการเดินทาง</p>
                 <h1 style="font-size: 45px; margin: 5px 0;"><span id="summaryDistance" style="color: #111;">0.00</span> <span style="font-size: 20px; color: #555;">km</span></h1>
@@ -159,27 +125,19 @@
             <button class="btn-danger" onclick="logout()">🚪 ออกจากระบบ</button>
         </div>
 
-        <!-- ============================================== -->
-        <!-- 5. หน้า Dashboard เส้นทางสาธารณะ -->
-        <!-- ============================================== -->
+        <!-- 5. หน้าเส้นทางสาธารณะ -->
         <div id="publicSection" class="app-section">
             <h2>🌍 เส้นทางของนักเดินทาง</h2>
             <p class="desc">ดูเส้นทางการเดินทางของคนอื่นๆ ในระบบ (ไม่ระบุตัวตน)</p>
-            
             <button class="btn-primary" onclick="loadPublicDashboard()">🔄 รีเฟรชข้อมูล</button>
             <p id="publicStatus" class="status-msg" style="color:#007bff;">กำลังโหลดข้อมูล...</p>
             <div id="publicMap"></div>
-
             <button class="btn-danger" onclick="switchSection('loginSection')">🔙 กลับหน้าหลัก</button>
         </div>
-
     </div>
 
-    <!-- Script ควบคุมการทำงาน -->
     <script>
-        // 🛑 1. ใส่ Web App URL ของคุณที่นี่
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvEJM9M3XdRXUmwrzBu0YDmH-Ft1B-nbbwrW1KWfAHGB9jnBzam_if0VlpAOr0P_hjQg/exec';
-        // 🛑 2. ใส่ Google Client ID ของคุณที่นี่ (ถ้ามี)
         const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'; 
         
         let currentUserEmail = ""; 
@@ -187,7 +145,24 @@
         let myMap = null, publicMap = null;
         let currentTripId = null, routeCoordinates = [], routingControl = null;
 
-        // --- ระบบแจ้งเตือน Browser ---
+        // เช็คสถานะล็อกอินค้างไว้ (แก้ปัญหารีเฟรชแล้วหลุด)
+        window.onload = function () {
+            const savedEmail = localStorage.getItem('loggedInEmail');
+            if (savedEmail) {
+                currentUserEmail = savedEmail;
+                document.getElementById('displayEmail').innerText = currentUserEmail;
+                switchSection('appSection');
+                restoreTripState();
+            }
+
+            if(GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com') {
+                google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleResponse });
+                google.accounts.id.renderButton(document.getElementById("googleBtnContainer"), { theme: "outline", size: "large", width: "100%" });
+            } else {
+                document.getElementById("googleBtnContainer").innerHTML = "<p style='font-size:12px;color:gray;'>*ยังไม่ได้ตั้งค่า Google Client ID</p>";
+            }
+        };
+
         function showBrowserNotification(title, message) {
             if (!("Notification" in window)) return;
             if (Notification.permission === "granted") {
@@ -198,7 +173,6 @@
         }
         if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
 
-        // --- เปลี่ยนหน้า UI ---
         function switchSection(sectionId) {
             document.querySelectorAll('.app-section').forEach(sec => sec.classList.remove('active'));
             document.getElementById(sectionId).classList.add('active');
@@ -208,18 +182,6 @@
         const callAPI = (payload, callback) => {
             fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
             .then(res => res.json()).then(callback).catch(err => console.log(err));
-        };
-
-        // ==========================================
-        // ระบบ Authentication
-        // ==========================================
-        window.onload = function () {
-            if(GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com') {
-                google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleResponse });
-                google.accounts.id.renderButton(document.getElementById("googleBtnContainer"), { theme: "outline", size: "large", width: "100%" });
-            } else {
-                document.getElementById("googleBtnContainer").innerHTML = "<p style='font-size:12px;color:gray;'>*ยังไม่ได้ตั้งค่า Google Client ID</p>";
-            }
         };
 
         function handleGoogleResponse(response) {
@@ -263,6 +225,7 @@
         function handleLoginResult(data) {
             if (data.status === 'success') {
                 currentUserEmail = data.email;
+                localStorage.setItem('loggedInEmail', currentUserEmail); // จำสถานะล็อกอิน
                 document.getElementById('displayEmail').innerText = currentUserEmail;
                 switchSection('appSection');
                 restoreTripState();
@@ -295,19 +258,16 @@
         }
 
         function logout() {
+            localStorage.removeItem('loggedInEmail'); // ล้างสถานะล็อกอิน
             clearTripState();
             if (liff.isLoggedIn()) liff.logout();
             location.reload();
         }
 
-        // ==========================================
-        // ระบบลืมรหัสผ่าน (Forgot Password)
-        // ==========================================
         function requestOTP() {
             const email = document.getElementById('resetEmail').value.trim();
             if(!email) return alert("กรุณาใส่อีเมล");
             document.getElementById('forgotStatus').innerText = "กำลังส่งรหัส OTP ไปที่อีเมล...";
-            
             callAPI({ action: 'request_otp', email: email }, (res) => {
                 document.getElementById('forgotStatus').innerText = res.message;
                 if(res.status === 'success') {
@@ -330,9 +290,6 @@
             });
         }
 
-        // ==========================================
-        // ระบบติดตามการเดินทาง (Tracker)
-        // ==========================================
         function saveTripState() {
             localStorage.setItem('tripId', currentTripId);
             localStorage.setItem('coords', JSON.stringify(routeCoordinates));
@@ -344,11 +301,9 @@
             if (localStorage.getItem('tripId')) {
                 currentTripId = localStorage.getItem('tripId');
                 routeCoordinates = JSON.parse(localStorage.getItem('coords'));
-                
                 document.getElementById('startTripBtn').style.display = 'none';
                 document.getElementById('tripControls').style.display = 'block';
                 document.getElementById('appStatus').innerText = "🔄 โหลดเส้นทางล่าสุด...";
-                
                 if (routeCoordinates.length > 0) drawMyMap();
             }
         }
@@ -356,13 +311,11 @@
         function drawMyMap() {
             document.getElementById('map').style.display = 'block';
             const last = routeCoordinates[routeCoordinates.length - 1];
-            
             if (!myMap) {
                 myMap = L.map('map').setView([last[0], last[1]], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(myMap);
             }
             routeCoordinates.forEach((c, i) => L.marker([c[0], c[1]]).addTo(myMap).bindPopup("จุด " + (i+1)));
-            
             if (routeCoordinates.length > 1) {
                 if(routingControl) myMap.removeControl(routingControl);
                 routingControl = L.Routing.control({
@@ -378,13 +331,10 @@
             currentTripId = "TRIP_" + new Date().getTime(); 
             routeCoordinates = []; 
             clearTripState(); 
-            
             document.getElementById('startTripBtn').style.display = 'none';
             document.getElementById('tripControls').style.display = 'block';
-            
             saveTripState(); 
             showBrowserNotification("🚗 เริ่มเดินทาง!", "ระบบกำลังบันทึกเส้นทาง");
-            
             callAPI({ action: 'notify', type: 'start', email: currentUserEmail, tripId: currentTripId }, () => {
                 document.getElementById('appStatus').innerText = "🚀 เริ่มการเดินทางแล้ว!";
             });
@@ -393,7 +343,6 @@
         function checkIn() {
             if (!navigator.geolocation) return;
             document.getElementById('appStatus').innerText = "📍 กำลังหาพิกัด...";
-            
             const locName = document.getElementById('locationNameInput').value.trim();
             
             navigator.geolocation.getCurrentPosition((pos) => {
@@ -455,15 +404,12 @@
             if(myMap) { myMap.remove(); myMap = null; routingControl = null; }
         }
 
-        // ==========================================
-        // ระบบ Dashboard สาธารณะ (วาดเส้นทางตามถนนจริง)
-        // ==========================================
+        // หน้า Public Dashboard (วาดเส้นโค้งตามถนนจริง)
         function loadPublicDashboard() {
             switchSection('publicSection');
             document.getElementById('publicStatus').innerText = "กำลังโหลดข้อมูลเส้นทาง...";
             
             if(!publicMap) {
-                // ศูนย์กลางพิกัดศรีสะเกษ
                 publicMap = L.map('publicMap').setView([15.1186, 104.3220], 10);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(publicMap);
             }
@@ -472,7 +418,6 @@
                 if(res.status === 'success') {
                     document.getElementById('publicStatus').innerText = `พบข้อมูล ${Object.keys(res.data).length} เส้นทาง`;
                     
-                    // เคลียร์เส้นและหมุดเก่าบนแผนที่
                     publicMap.eachLayer((layer) => { 
                         if (layer instanceof L.Polyline || layer instanceof L.Marker) publicMap.removeLayer(layer); 
                         if (layer._routing) publicMap.removeControl(layer);
@@ -486,17 +431,13 @@
                         if(coords.length > 1) {
                             let color = colors[idx % colors.length]; idx++;
                             
-                            // วาดเส้นทางเลี้ยวตามโค้งถนนด้วย Leaflet Routing Machine
                             L.Routing.control({
                                 waypoints: coords.map(c => L.latLng(c[0], c[1])),
-                                routeWhileDragging: false, 
-                                addWaypoints: false, 
-                                show: false, // ซ่อนกล่องข้อความบอกทาง
-                                createMarker: function() { return null; }, // ไม่ต้องสร้างหมุดซ้ำ
+                                routeWhileDragging: false, addWaypoints: false, show: false,
+                                createMarker: function() { return null; },
                                 lineOptions: { styles: [{color: color, weight: 5, opacity: 0.8}] }
                             }).addTo(publicMap);
                             
-                            // ปักหมุดเฉพาะจุดเริ่มต้นและจุดสิ้นสุด
                             L.circleMarker(coords[0], {color: 'black', fillColor: 'white', fillOpacity: 1, radius: 6}).addTo(publicMap).bindPopup("จุดเริ่มต้น");
                             L.circleMarker(coords[coords.length-1], {color: 'black', fillColor: color, fillOpacity: 1, radius: 6}).addTo(publicMap).bindPopup("จุดสิ้นสุด");
                         }
